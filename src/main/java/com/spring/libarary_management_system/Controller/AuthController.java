@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -64,13 +63,12 @@ public class AuthController {
 
     @Operation(
             summary = "Create new user",
-            description = "Admin creates a new user account with a specific role."
+            description = " creates a new user account with a specific role."
     )
-    @PostMapping("/create-user")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/register")
     public ResponseEntity<BasicResponse> createUser(@RequestBody UserCreateDTO user){
         return ResponseEntity.ok(new BasicResponse(Messages.CREATE_NEW_USER,authService.createUser(user)));
     }
 
-    
+
 }
