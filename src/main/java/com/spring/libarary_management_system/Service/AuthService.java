@@ -5,10 +5,13 @@ package com.spring.libarary_management_system.Service;
 import com.spring.libarary_management_system.DTOs.*;
 import com.spring.libarary_management_system.Entity.Role;
 import com.spring.libarary_management_system.Entity.User;
+import com.spring.libarary_management_system.Events.PasswordCodeRegeneratedEvent;
+import com.spring.libarary_management_system.Events.PasswordResetRequestedEvent;
 import com.spring.libarary_management_system.Exception.*;
 import com.spring.libarary_management_system.Repository.RoleRepository;
 import com.spring.libarary_management_system.Repository.TokenRepository;
 import com.spring.libarary_management_system.Repository.UserRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -19,6 +22,11 @@ import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import java.time.LocalDateTime;
+import java.util.Random;
+
+import static com.spring.libarary_management_system.Config.RabbitConstants.*;
+
 @Service
 @Validated
 @RequiredArgsConstructor
@@ -27,6 +35,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenRepository tokenRepository;
+    private final RabbitTemplate rabbitTemplate;
     private final RoleRepository roleRepository;
     private final JwtService jwtService;
 
@@ -69,6 +78,57 @@ public class AuthService {
         // Manual mapping Entity → DTO
         return mapToDTO(savedUser);
     }
+    private String generateConfirmationCode() {
+        Random random = new Random();
+        int code = 1000 + random.nextInt(90000);
+        return String.valueOf(code);
+    }
+
+
+
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException());
+        String resetCode = generateConfirmationCode();
+        user.setRequestCode(resetCode);
+        userRepository.save(user);
+
+        PasswordResetRequestedEvent event = new PasswordResetRequestedEvent(user.getId(), user.getUsername(),
+                user.getEmail(), resetCode, LocalDateTime.now());
+        rabbitTemplate.convertAndSend(MAIL_EXCHANGE, MAIL_PASSWORD_RESET_KEY, event);
+    }
+
+    public void resetPassword(@Valid ResetPasswordDTO resetPasswodDTO) {
+        User user = userRepository.findByEmail(resetPasswodDTO.getEmail())
+                .orElseThrow(() -> new UserNotFoundException());
+        if (!resetPasswodDTO.getCode().equals(user.getRequestCode())) {
+            throw new InvalidResetCodeException();
+        }
+        user.setPassword(passwordEncoder.encode(resetPasswodDTO.getNewPassword()));
+        user.setRequestCode(null);
+        userRepository.save(user);
+
+    }
+
+    public void changePassword(String email, @Valid UserChangePasswordRequestDTO request) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException());
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new InvalidCurrentPasswordException();
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    public void reGenerateCode(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException());
+        String resetCode = generateConfirmationCode();
+        user.setRequestCode(resetCode);
+        userRepository.save(user);
+
+        rabbitTemplate.convertAndSend(MAIL_EXCHANGE, MAIL_CODE_GENERATE_KEY,
+                new PasswordCodeRegeneratedEvent(user.getEmail(), user.getUsername(), resetCode));
+
+    }
+
 
     public User getUserByEmail(String username) {
         return userRepository.findByUsername(username)

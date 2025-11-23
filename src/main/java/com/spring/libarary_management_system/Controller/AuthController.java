@@ -1,15 +1,14 @@
 package com.spring.libarary_management_system.Controller;
 
-import com.spring.libarary_management_system.DTOs.AuthResponse;
-import com.spring.libarary_management_system.DTOs.BasicResponse;
-import com.spring.libarary_management_system.DTOs.LoginRequestDTO;
-import com.spring.libarary_management_system.DTOs.UserCreateDTO;
+import com.spring.libarary_management_system.DTOs.*;
+import com.spring.libarary_management_system.Entity.User;
 import com.spring.libarary_management_system.Exception.Messages;
 import com.spring.libarary_management_system.Service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -63,12 +62,53 @@ public class AuthController {
 
     @Operation(
             summary = "Create new user",
-            description = " creates a new user account with a specific role."
+            description = "Admin creates a new user account with a specific role."
     )
-    @PostMapping("/register")
+    @PostMapping("/create-user")
     public ResponseEntity<BasicResponse> createUser(@RequestBody UserCreateDTO user){
         return ResponseEntity.ok(new BasicResponse(Messages.CREATE_NEW_USER,authService.createUser(user)));
     }
 
+    @Operation(
+            summary = "Change user password",
+            description = "Authenticated user changes their current password."
+    )
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<BasicResponse> changePassword(@AuthenticationPrincipal User user,
+                                                        @RequestBody UserChangePasswordRequestDTO request){
+        authService.changePassword(user.getEmail(), request);
+        return ResponseEntity.ok(new BasicResponse(Messages.CHANGE_PASSWORD));
+    }
 
+    @Operation(
+            summary = "Regenerate verification code",
+            description = "Send a new verification code to the user’s email."
+    )
+    @PostMapping("/regenerate-code")
+    public ResponseEntity<BasicResponse> regenerateCode(@RequestBody EmailRequestDTO request) {
+
+        authService.reGenerateCode(request.getEmail());
+        return ResponseEntity.ok(new BasicResponse(Messages.CODE_SENT));
+    }
+
+    @Operation(
+            summary = "Forget password",
+            description = "Send a reset code to the user's registered email address."
+    )
+    @PostMapping("/forget-password")
+    public ResponseEntity<BasicResponse> forgetPassword(@RequestBody EmailRequestDTO request){
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(new BasicResponse(Messages.CODE_SENT));
+    }
+
+    @Operation(
+            summary = "Reset password",
+            description = "Reset the password using the verification code sent via email."
+    )
+    @PostMapping("/reset-password")
+    public ResponseEntity<BasicResponse> resetPassword(@RequestBody ResetPasswordDTO resetPasswodDTO){
+        authService.resetPassword(resetPasswodDTO);
+        return ResponseEntity.ok(new BasicResponse(Messages.CHANGE_PASSWORD));
+    }
 }
