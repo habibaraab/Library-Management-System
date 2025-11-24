@@ -24,6 +24,7 @@ import jakarta.validation.ConstraintViolationException;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
+    // === Common Utility === //
     private ResponseEntity<BasicResponse> buildErrorResponse(Exception ex, WebRequest request, HttpStatus status) {
         BasicResponse response = new BasicResponse(  ex.getMessage(), request.getDescription(false));
         return new ResponseEntity<>(response, status);
@@ -73,9 +74,12 @@ public class GlobalExceptionHandler {
             InvalidResetCodeException.class,
             InvalidCurrentPasswordException.class,
             UserNotFoundException.class,
+            CategoryNotFoundException.class,
             EmailAlreadyExistsException.class,
-
             RoleNotFoundException.class,
+            ParentCategoryNotFoundException.class,
+            RoleAlreadyExistsException.class,
+
 
     })
     public ResponseEntity<BasicResponse> handleNotFoundBusinessExceptions(Exception ex, WebRequest request) {
@@ -121,5 +125,26 @@ public class GlobalExceptionHandler {
 
     }
 
+    // === Fallback Exceptions === //
 
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<BasicResponse> handleRuntime(RuntimeException ex, WebRequest request) {
+        return buildErrorResponse(ex, request, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<BasicResponse> handleAll(Exception ex, WebRequest request) {
+        return buildErrorResponse(ex, request, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<BasicResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String parameterName = ex.getName();
+        Object invalidValue = ex.getValue();
+        BasicResponse response = new BasicResponse(
+                Messages.INVALID_ID_FORMAT,
+                "parameter = " + parameterName + ", value = " + invalidValue
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
 }
